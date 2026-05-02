@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -21,53 +20,62 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Shield, UserIcon } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { getInitials, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import type { User, UserRole } from "@/types/database";
 
-interface AdminUsersProps {
-  users: User[];
-  currentUserId: string;
-}
+const MOCK_USERS: User[] = [
+  {
+    id: "u1",
+    full_name: "Alex Developer",
+    email: "alex@synqr.app",
+    role: "admin",
+    designation: "Frontend Engineer",
+    avatar_url: "https://avatar.vercel.sh/alex",
+    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+  },
+  {
+    id: "u2",
+    full_name: "Sarah Chen",
+    email: "sarah@synqr.app",
+    role: "user",
+    designation: "Product Designer",
+    avatar_url: "https://avatar.vercel.sh/sarah",
+    created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
+  },
+  {
+    id: "u3",
+    full_name: "Mike Johnson",
+    email: "mike@synqr.app",
+    role: "user",
+    designation: "Backend Developer",
+    avatar_url: "https://avatar.vercel.sh/mike",
+    created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+  }
+];
 
-export function AdminUsers({ users: initialUsers, currentUserId }: AdminUsersProps) {
-  const router = useRouter();
-  const [users, setUsers] = useState(initialUsers);
+const CURRENT_USER_ID = "u1";
+
+export function AdminUsers() {
+  const [users, setUsers] = useState<User[]>(MOCK_USERS);
 
   const adminCount = users.filter((u) => u.role === "admin").length;
   const userCount = users.filter((u) => u.role === "user").length;
 
-  const handleRoleChange = async (userId: string, newRole: UserRole) => {
-    if (userId === currentUserId) {
+  const handleRoleChange = (userId: string, newRole: UserRole) => {
+    if (userId === CURRENT_USER_ID) {
       toast.error("You cannot change your own role");
       return;
     }
 
-    // Optimistic update
     setUsers((prev) =>
       prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
     );
-
-    try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("users")
-        .update({ role: newRole })
-        .eq("id", userId);
-
-      if (error) throw error;
-      toast.success(`Role updated to ${newRole}`);
-      router.refresh();
-    } catch {
-      // Revert
-      setUsers(initialUsers);
-      toast.error("Failed to update role");
-    }
+    toast.success(`Role updated to ${newRole}`);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl mx-auto animate-fade-in">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
@@ -139,7 +147,7 @@ export function AdminUsers({ users: initialUsers, currentUserId }: AdminUsersPro
                       </Avatar>
                       <div>
                         <p className="text-sm font-medium">{user.full_name}</p>
-                        {user.id === currentUserId && (
+                        {user.id === CURRENT_USER_ID && (
                           <span className="text-[10px] text-muted-foreground">
                             (You)
                           </span>
@@ -154,7 +162,7 @@ export function AdminUsers({ users: initialUsers, currentUserId }: AdminUsersPro
                     {user.designation || "—"}
                   </TableCell>
                   <TableCell>
-                    {user.id === currentUserId ? (
+                    {user.id === CURRENT_USER_ID ? (
                       <Badge
                         variant="secondary"
                         className="bg-primary/10 text-primary text-xs"
