@@ -8,33 +8,14 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
-
-  if (!authUser) {
-    redirect("/login");
-  }
-
-  // Fetch user profile
-  const { data: userProfile } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", authUser.id)
-    .single();
-
-  const user: User | null = userProfile || {
-    id: authUser.id,
-    full_name:
-      authUser.user_metadata?.full_name ||
-      authUser.email?.split("@")[0] ||
-      "User",
-    email: authUser.email || "",
-    role: "user" as const,
-    designation: null,
-    avatar_url: authUser.user_metadata?.avatar_url || null,
-    created_at: authUser.created_at,
+  const user: User = {
+    id: "u1",
+    full_name: "Alex Developer",
+    email: "alex@synqr.app",
+    role: "admin",
+    designation: "Frontend Engineer",
+    avatar_url: "https://avatar.vercel.sh/alex",
+    created_at: new Date().toISOString(),
   };
 
   return <AppShell user={user}>{children}</AppShell>;
