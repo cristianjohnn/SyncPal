@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Zap, Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 function LoginContent() {
@@ -72,17 +72,15 @@ function LoginContent() {
     <div className="w-full max-w-md animate-fade-in">
       {/* Card */}
       <div className="glass rounded-2xl p-8 shadow-2xl shadow-black/5 dark:shadow-black/20">
-        {/* Logo & Header */}
+        {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground mb-4 shadow-lg shadow-primary/25">
-            <Zap className="h-6 w-6" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight gradient-text">
-            Synqr
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Where development teams stay in flow
-          </p>
+          <img
+            src="/synqr-logo.png"
+            alt="Synqr"
+            width={120}
+            height={120}
+            style={{ objectFit: "contain" }}
+          />
         </div>
 
         {/* Error message */}

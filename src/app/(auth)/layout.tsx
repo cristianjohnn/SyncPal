@@ -7,17 +7,16 @@ export default function AuthLayout({
 }) {
   return (
     <div className="auth-layout">
-      {/* ===== Left Half — Branding Panel ===== */}
+      {/* ===== Left Half — Aurora Borealis Panel ===== */}
       <div className="auth-left-panel">
-        {/* --- Background layers (z-0) --- */}
+        {/* --- Aurora light layers (z-0) --- */}
+        <div className="aurora aurora--1" />
+        <div className="aurora aurora--2" />
+        <div className="aurora aurora--3" />
+        <div className="aurora aurora--4" />
+        <div className="aurora aurora--5" />
 
-        {/* Purple glow orb */}
-        <div className="auth-glow auth-glow--purple" />
-
-        {/* Blue glow orb */}
-        <div className="auth-glow auth-glow--blue" />
-
-        {/* Floating dots */}
+        {/* --- Floating dot nodes (z-1) --- */}
         <span className="auth-dot auth-dot--1" />
         <span className="auth-dot auth-dot--2" />
         <span className="auth-dot auth-dot--3" />
@@ -25,15 +24,15 @@ export default function AuthLayout({
         <span className="auth-dot auth-dot--5" />
         <span className="auth-dot auth-dot--6" />
 
-        {/* --- Main content (z-1) --- */}
+        {/* --- Main content (z-2) --- */}
         <div className="auth-left-content">
-          {/* A. Official Logo Image */}
+          {/* A. Full Logo Image — the hero element */}
           <div className="auth-logo-wrapper">
             <Image
               src="/synqr-logo.png"
               alt="Synqr — Where dev teams stay in flow"
-              width={220}
-              height={220}
+              width={260}
+              height={260}
               className="auth-logo-img"
               priority
             />
@@ -44,16 +43,15 @@ export default function AuthLayout({
 
           {/* C. Feature highlights */}
           <div className="auth-features">
-            {/* Feature 1 — Branches & PRs */}
+            {/* Feature 1 — Branches & PRs (teal) */}
             <div className="auth-feature auth-feature--1">
-              <span className="auth-feature-icon">
-                {/* Git Branch SVG */}
+              <span className="auth-feature-icon auth-feature-icon--teal">
                 <svg
-                  width="16"
-                  height="16"
+                  width="15"
+                  height="15"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#4F6EF7"
+                  stroke="#00FFB2"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -69,13 +67,12 @@ export default function AuthLayout({
               </span>
             </div>
 
-            {/* Feature 2 — Kanban boards */}
+            {/* Feature 2 — Kanban boards (blue) */}
             <div className="auth-feature auth-feature--2">
-              <span className="auth-feature-icon">
-                {/* Kanban / Layout Grid SVG */}
+              <span className="auth-feature-icon auth-feature-icon--blue">
                 <svg
-                  width="16"
-                  height="16"
+                  width="15"
+                  height="15"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="#4F6EF7"
@@ -94,16 +91,15 @@ export default function AuthLayout({
               </span>
             </div>
 
-            {/* Feature 3 — Notifications */}
+            {/* Feature 3 — Notifications (violet) */}
             <div className="auth-feature auth-feature--3">
-              <span className="auth-feature-icon">
-                {/* Bell SVG */}
+              <span className="auth-feature-icon auth-feature-icon--violet">
                 <svg
-                  width="16"
-                  height="16"
+                  width="15"
+                  height="15"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#4F6EF7"
+                  stroke="#7C3AED"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -119,22 +115,22 @@ export default function AuthLayout({
           </div>
         </div>
 
-        {/* Bottom credit */}
-        <p className="auth-bottom-credit">
-          Built by developers, for developers.
-        </p>
-
-        {/* Top-left small branding */}
+        {/* Top-left branding */}
         <div className="auth-top-brand">
           <Image
             src="/synqr-logo.png"
             alt="Synqr"
-            width={28}
-            height={28}
+            width={24}
+            height={24}
             className="auth-top-brand-logo"
           />
           <span className="auth-top-brand-text">Synqr</span>
         </div>
+
+        {/* Bottom credit */}
+        <p className="auth-bottom-credit">
+          Built by developers, for developers.
+        </p>
       </div>
 
       {/* ===== Right Half — Form ===== */}
