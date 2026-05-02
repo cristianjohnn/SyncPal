@@ -34,17 +34,20 @@ export default function AuthLayout({
             <Image
               src="/synqr-logo.png"
               alt="Synqr Icon"
-              width={200}
-              height={200}
+              width={220}
+              height={220}
               className="auth-logo-img"
               priority
             />
-            <h1 className="text-white text-[5rem] font-extrabold tracking-tight leading-none mt-2">
+            <h1 className="text-white text-[5.5rem] font-extrabold tracking-tight leading-none mt-2">
               Synq<span className="text-[#7C3AED]">r</span>
             </h1>
             <p className="text-white/80 text-xl mt-1 font-medium tracking-wide">
               Where dev teams stay in <span className="text-[#7C3AED]">flow.</span>
             </p>
+            <a href="#" className="auth-ghost-btn">
+              Get Early Access &rarr;
+            </a>
           </div>
 
           {/* B. Divider */}
