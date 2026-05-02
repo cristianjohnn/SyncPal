@@ -31,34 +31,4 @@ export async function logActivity({
   });
 }
 
-export function getActivityMessage(action: string, entityType: string): string {
-  const messages: Record<string, Record<string, string>> = {
-    created: {
-      board: "created a new board",
-      task: "created a new task",
-      branch: "created a new branch",
-    },
-    updated: {
-      board: "updated a board",
-      task: "updated a task",
-      branch: "updated a branch",
-    },
-    deleted: {
-      board: "deleted a board",
-      task: "deleted a task",
-      branch: "deleted a branch",
-    },
-    status_changed: {
-      task: "changed task status",
-      branch: "changed branch status",
-    },
-    assigned: {
-      task: "assigned a task",
-    },
-    moved: {
-      task: "moved a task",
-    },
-  };
-
-  return messages[action]?.[entityType] || `${action} a ${entityType}`;
-}
+export { getActivityMessage } from "@/lib/activity-format";

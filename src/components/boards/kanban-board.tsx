@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   DragDropContext,
   Droppable,
@@ -26,12 +26,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, ArrowLeft } from "lucide-react";
+import { Plus, ArrowLeft, Loader2 } from "lucide-react";
 import { TaskCard } from "@/components/boards/task-card";
 import { TaskDialog } from "@/components/boards/task-dialog";
 import { toast } from "sonner";
 import Link from "next/link";
-import type { TaskStatus, TaskPriority } from "@/types/database";
+import type { TaskStatus, TaskPriority, Board } from "@/types/database";
+import type {
+  BoardDirectoryUser,
+  KanbanPageSession,
+  KanbanTask,
+} from "@/lib/queries/boards";
+import { createTask, updateTask } from "@/app/(app)/boards/actions";
 
 const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
   { id: "todo", label: "To Do", color: "bg-slate-500" },
@@ -40,82 +46,35 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
   { id: "done", label: "Done", color: "bg-emerald-500" },
 ];
 
-const MOCK_BOARD = {
-  id: "1",
-  name: "Frontend Redesign",
-  description: "Complete overhaul of the user interface using Tailwind v4.",
-};
+const COLUMN_ORDER: TaskStatus[] = COLUMNS.map((c) => c.id);
 
-const MOCK_USERS = [
-  { id: "u1", full_name: "Alex Developer", avatar_url: "https://avatar.vercel.sh/alex", email: "alex@example.com" },
-  { id: "u2", full_name: "Sarah Chen", avatar_url: "https://avatar.vercel.sh/sarah", email: "sarah@example.com" },
-];
+function reorderFlat(tasks: KanbanTask[]): KanbanTask[] {
+  return COLUMN_ORDER.flatMap((col) =>
+    tasks.filter((t) => t.status === col)
+  );
+}
 
-const MOCK_TASKS = [
-  {
-    id: "t1",
-    title: "Implement Navigation Bar",
-    description: "Create the top navigation bar with user profile and search.",
-    status: "done" as TaskStatus,
-    priority: "high" as TaskPriority,
-    board_id: "1",
-    assigned_to: "u1",
-    created_by: "u2",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    assignee: MOCK_USERS[0],
-    branches: [{ id: "b1", name: "feat/nav-bar", status: "merged" }]
-  },
-  {
-    id: "t2",
-    title: "Design System Migration",
-    description: "Move all colors and fonts to globals.css.",
-    status: "in_progress" as TaskStatus,
-    priority: "urgent" as TaskPriority,
-    board_id: "1",
-    assigned_to: "u2",
-    created_by: "u1",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    assignee: MOCK_USERS[1],
-    branches: [{ id: "b2", name: "chore/design-system", status: "ongoing" }]
-  },
-  {
-    id: "t3",
-    title: "Update Auth Flow",
-    description: "Use split layout for login and signup pages.",
-    status: "review" as TaskStatus,
-    priority: "medium" as TaskPriority,
-    board_id: "1",
-    assigned_to: "u1",
-    created_by: "u2",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    assignee: MOCK_USERS[0],
-    branches: [{ id: "b3", name: "feat/auth-ui", status: "review" }]
-  },
-  {
-    id: "t4",
-    title: "Kanban Board Drag & Drop",
-    description: "Implement drag and drop for task cards.",
-    status: "todo" as TaskStatus,
-    priority: "high" as TaskPriority,
-    board_id: "1",
-    assigned_to: "u1",
-    created_by: "u1",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    assignee: MOCK_USERS[0],
-    branches: []
-  }
-];
+interface KanbanBoardProps {
+  board: Board;
+  initialTasks: KanbanTask[];
+  users: BoardDirectoryUser[];
+  session: KanbanPageSession;
+}
 
-export function KanbanBoard() {
-  const [tasks, setTasks] = useState<any[]>(MOCK_TASKS);
-  const [selectedTask, setSelectedTask] = useState<any | null>(null);
+export function KanbanBoard({
+  board,
+  initialTasks,
+  users,
+  session,
+}: KanbanBoardProps) {
+  const [tasks, setTasks] = useState<KanbanTask[]>(() =>
+    reorderFlat(initialTasks)
+  );
+  const [selectedTask, setSelectedTask] = useState<KanbanTask | null>(null);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createColumn, setCreateColumn] = useState<TaskStatus>("todo");
+  const [creatingTask, setCreatingTask] = useState(false);
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -128,64 +87,130 @@ export function KanbanBoard() {
     [tasks]
   );
 
-  const handleDragEnd = (result: DropResult) => {
+  const handleDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
     if (!destination) return;
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    )
-      return;
 
-    const newStatus = destination.droppableId as TaskStatus;
+    const sourceCol = source.droppableId as TaskStatus;
+    const destCol = destination.droppableId as TaskStatus;
     const taskId = draggableId;
 
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
+    if (
+      sourceCol === destCol &&
+      destination.index === source.index
+    ) {
+      return;
+    }
+
+    if (sourceCol === destCol) {
+      setTasks((prev) => {
+        const colTasks = prev.filter((t) => t.status === sourceCol);
+        const others = prev.filter((t) => t.status !== sourceCol);
+        const reordered = [...colTasks];
+        const [removed] = reordered.splice(source.index, 1);
+        reordered.splice(destination.index, 0, removed);
+        return reorderFlat([...others, ...reordered]);
+      });
+      return;
+    }
+
+    const previous = tasks;
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    setTasks((prev) => {
+      const rest = prev.filter((t) => t.id !== taskId);
+      const destTasks = rest.filter((t) => t.status === destCol);
+      const others = rest.filter((t) => t.status !== destCol);
+      const moved: KanbanTask = { ...task, status: destCol };
+      const newDest = [
+        ...destTasks.slice(0, destination.index),
+        moved,
+        ...destTasks.slice(destination.index),
+      ];
+      return reorderFlat([...others, ...newDest]);
+    });
+
+    setSelectedTask((prev) =>
+      prev?.id === taskId ? { ...prev, status: destCol } : prev
     );
-    toast.success("Task moved successfully!");
+
+    const apiResult = await updateTask({
+      board_id: board.id,
+      id: taskId,
+      status: destCol,
+    });
+
+    if (!apiResult.ok) {
+      setTasks(reorderFlat(previous));
+      setSelectedTask((prev) =>
+        prev?.id === taskId ? { ...prev, status: task.status } : prev
+      );
+      toast.error(apiResult.error);
+      return;
+    }
+
+    setTasks((prev) =>
+      reorderFlat(
+        prev.map((t) => (t.id === taskId ? apiResult.data : t))
+      )
+    );
+    setSelectedTask((prev) =>
+      prev?.id === taskId ? apiResult.data : prev
+    );
+    toast.success("Task moved");
   };
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTask.title.trim()) {
       toast.error("Task title is required");
       return;
     }
-    
-    const assignee = MOCK_USERS.find(u => u.id === newTask.assigned_to);
 
-    const createdTask = {
-      id: Math.random().toString(),
+    setCreatingTask(true);
+    const result = await createTask({
+      board_id: board.id,
       title: newTask.title.trim(),
-      description: newTask.description.trim(),
+      description: newTask.description.trim() || null,
       status: createColumn,
       priority: newTask.priority,
-      board_id: MOCK_BOARD.id,
       assigned_to: newTask.assigned_to || null,
-      created_by: "u1",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      assignee: assignee || null,
-      branches: []
-    };
+    });
+    setCreatingTask(false);
 
-    setTasks((prev) => [...prev, createdTask]);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+
+    setTasks((prev) => reorderFlat([...prev, result.data]));
     toast.success("Task created!");
-    setNewTask({ title: "", description: "", priority: "medium", assigned_to: "" });
+    setNewTask({
+      title: "",
+      description: "",
+      priority: "medium",
+      assigned_to: "",
+    });
     setCreateDialogOpen(false);
   };
 
-  const handleTaskUpdate = (updatedTask: any) => {
-    setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
-    setSelectedTask(updatedTask);
+  const handleTaskUpdated = (updated: KanbanTask) => {
+    setTasks((prev) =>
+      reorderFlat(prev.map((t) => (t.id === updated.id ? updated : t)))
+    );
+    setSelectedTask(updated);
   };
 
-  const handleTaskDelete = (taskId: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+  const handleTaskDeleted = (taskId: string) => {
+    setTasks((prev) => reorderFlat(prev.filter((t) => t.id !== taskId)));
     setTaskDialogOpen(false);
     setSelectedTask(null);
   };
+
+  const canDeleteSelected =
+    selectedTask &&
+    (session.isAdmin || selectedTask.created_by === session.userId);
 
   return (
     <div className="space-y-6 h-[calc(100vh-8rem)] flex flex-col animate-fade-in">
@@ -193,15 +218,19 @@ export function KanbanBoard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-3">
           <Link href="/boards">
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-full hover:bg-muted">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 rounded-full hover:bg-muted"
+            >
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{MOCK_BOARD.name}</h1>
-            {MOCK_BOARD.description && (
+            <h1 className="text-2xl font-bold tracking-tight">{board.name}</h1>
+            {board.description && (
               <p className="text-sm text-muted-foreground mt-0.5">
-                {MOCK_BOARD.description}
+                {board.description}
               </p>
             )}
           </div>
@@ -223,12 +252,14 @@ export function KanbanBoard() {
                 key={column.id}
                 className="flex-shrink-0 w-[320px] flex flex-col rounded-xl bg-muted/20 border border-border overflow-hidden h-full"
               >
-                {/* Column header */}
                 <div className="flex items-center justify-between p-3 border-b border-border/50 bg-muted/10 shrink-0">
                   <div className="flex items-center gap-2">
                     <div className={`h-2.5 w-2.5 rounded-full ${column.color}`} />
                     <h3 className="text-sm font-semibold">{column.label}</h3>
-                    <Badge variant="secondary" className="text-xs ml-1 bg-background/50">
+                    <Badge
+                      variant="secondary"
+                      className="text-xs ml-1 bg-background/50"
+                    >
                       {columnTasks.length}
                     </Badge>
                   </div>
@@ -245,16 +276,13 @@ export function KanbanBoard() {
                   </Button>
                 </div>
 
-                {/* Droppable column */}
                 <Droppable droppableId={column.id}>
                   {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
                       className={`flex-1 p-3 transition-colors ${
-                        snapshot.isDraggingOver
-                          ? "bg-primary/5"
-                          : ""
+                        snapshot.isDraggingOver ? "bg-primary/5" : ""
                       }`}
                     >
                       <ScrollArea className="h-full">
@@ -265,11 +293,11 @@ export function KanbanBoard() {
                               draggableId={task.id}
                               index={index}
                             >
-                              {(provided, snapshot) => (
+                              {(providedDrag, snapshotDrag) => (
                                 <div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
+                                  ref={providedDrag.innerRef}
+                                  {...providedDrag.draggableProps}
+                                  {...providedDrag.dragHandleProps}
                                   onClick={() => {
                                     setSelectedTask(task);
                                     setTaskDialogOpen(true);
@@ -278,7 +306,7 @@ export function KanbanBoard() {
                                 >
                                   <TaskCard
                                     task={task}
-                                    isDragging={snapshot.isDragging}
+                                    isDragging={snapshotDrag.isDragging}
                                   />
                                 </div>
                               )}
@@ -290,8 +318,7 @@ export function KanbanBoard() {
                     </div>
                   )}
                 </Droppable>
-                
-                {/* Add task button at bottom */}
+
                 <div className="p-2 border-t border-border/50 shrink-0">
                   <Button
                     variant="ghost"
@@ -311,7 +338,6 @@ export function KanbanBoard() {
         </div>
       </DragDropContext>
 
-      {/* Create task dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -348,7 +374,11 @@ export function KanbanBoard() {
                 <Select
                   value={newTask.priority}
                   onValueChange={(value) =>
-                    value && setNewTask({ ...newTask, priority: value as TaskPriority })
+                    value &&
+                    setNewTask({
+                      ...newTask,
+                      priority: value as TaskPriority,
+                    })
                   }
                 >
                   <SelectTrigger>
@@ -365,16 +395,21 @@ export function KanbanBoard() {
               <div className="space-y-2">
                 <Label>Assign to</Label>
                 <Select
-                  value={newTask.assigned_to}
+                  value={newTask.assigned_to || "__none__"}
                   onValueChange={(value) =>
-                    value && setNewTask({ ...newTask, assigned_to: value })
+                    value &&
+                    setNewTask({
+                      ...newTask,
+                      assigned_to: value === "__none__" ? "" : value,
+                    })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Unassigned" />
                   </SelectTrigger>
                   <SelectContent>
-                    {MOCK_USERS.map((u) => (
+                    <SelectItem value="__none__">Unassigned</SelectItem>
+                    {users.map((u) => (
                       <SelectItem key={u.id} value={u.id}>
                         {u.full_name}
                       </SelectItem>
@@ -384,25 +419,39 @@ export function KanbanBoard() {
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCreateDialogOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit">Create Task</Button>
+              <Button type="submit" disabled={creatingTask}>
+                {creatingTask ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Creating…
+                  </>
+                ) : (
+                  "Create Task"
+                )}
+              </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Task detail dialog */}
       {selectedTask && (
         <TaskDialog
+          mode="server"
+          boardId={board.id}
           task={selectedTask}
-          users={MOCK_USERS}
-          isAdmin={true}
+          users={users}
+          canDelete={!!canDeleteSelected}
           open={taskDialogOpen}
           onOpenChange={setTaskDialogOpen}
-          onUpdate={handleTaskUpdate}
-          onDelete={handleTaskDelete}
+          onUpdated={handleTaskUpdated}
+          onDeleted={handleTaskDeleted}
         />
       )}
     </div>

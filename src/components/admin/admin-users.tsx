@@ -19,52 +19,42 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Shield, UserIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, Shield, UserIcon, Trash2 } from "lucide-react";
 import { getInitials, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
-import type { User, UserRole } from "@/types/database";
+import { updateUserRole, removeUser } from "@/app/(app)/admin/actions";
+import type { UserRole } from "@/types/database";
 
-const MOCK_USERS: User[] = [
-  {
-    id: "u1",
-    full_name: "Alex Developer",
-    email: "alex@synqr.app",
-    role: "admin",
-    designation: "Frontend Engineer",
-    avatar_url: "https://avatar.vercel.sh/alex",
-    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
-  },
-  {
-    id: "u2",
-    full_name: "Sarah Chen",
-    email: "sarah@synqr.app",
-    role: "user",
-    designation: "Product Designer",
-    avatar_url: "https://avatar.vercel.sh/sarah",
-    created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
-  },
-  {
-    id: "u3",
-    full_name: "Mike Johnson",
-    email: "mike@synqr.app",
-    role: "user",
-    designation: "Backend Developer",
-    avatar_url: "https://avatar.vercel.sh/mike",
-    created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
-  }
-];
+interface AdminUsersProps {
+  users: Array<{
+    id: string;
+    full_name: string;
+    email: string;
+    role: UserRole;
+    avatar_url: string | null;
+    created_at: string;
+  }>;
+  currentUserId: string;
+  isAdmin: boolean;
+}
 
-const CURRENT_USER_ID = "u1";
-
-export function AdminUsers() {
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
+export function AdminUsers({ users: initialUsers, currentUserId, isAdmin }: AdminUsersProps) {
+  const [users, setUsers] = useState(initialUsers);
 
   const adminCount = users.filter((u) => u.role === "admin").length;
   const userCount = users.filter((u) => u.role === "user").length;
 
-  const handleRoleChange = (userId: string, newRole: UserRole) => {
-    if (userId === CURRENT_USER_ID) {
+  const handleRoleChange = async (userId: string, newRole: UserRole) => {
+    if (userId === currentUserId) {
       toast.error("You cannot change your own role");
+      return;
+    }
+
+    const result = await updateUserRole(userId, newRole);
+    
+    if (!result.ok) {
+      toast.error(result.error);
       return;
     }
 
@@ -72,6 +62,23 @@ export function AdminUsers() {
       prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
     );
     toast.success(`Role updated to ${newRole}`);
+  };
+
+  const handleRemoveUser = async (userId: string) => {
+    if (userId === currentUserId) {
+      toast.error("You cannot remove your own account");
+      return;
+    }
+
+    const result = await removeUser(userId);
+    
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    toast.success("User removed successfully");
   };
 
   return (
@@ -132,6 +139,7 @@ export function AdminUsers() {
                 <TableHead>Designation</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Joined</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -147,7 +155,7 @@ export function AdminUsers() {
                       </Avatar>
                       <div>
                         <p className="text-sm font-medium">{user.full_name}</p>
-                        {user.id === CURRENT_USER_ID && (
+                        {user.id === currentUserId && (
                           <span className="text-[10px] text-muted-foreground">
                             (You)
                           </span>
@@ -159,10 +167,10 @@ export function AdminUsers() {
                     {user.email}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {user.designation || "—"}
+                    —
                   </TableCell>
                   <TableCell>
-                    {user.id === CURRENT_USER_ID ? (
+                    {user.id === currentUserId ? (
                       <Badge
                         variant="secondary"
                         className="bg-primary/10 text-primary text-xs"
@@ -188,6 +196,18 @@ export function AdminUsers() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDate(user.created_at)}
+                  </TableCell>
+                  <TableCell>
+                    {user.id !== currentUserId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveUser(user.id)}
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
