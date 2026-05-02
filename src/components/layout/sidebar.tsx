@@ -13,6 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
+  Bell,
+  BarChart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -45,6 +47,22 @@ const navigation = [
     name: "My Tasks",
     href: "/tasks",
     icon: CheckSquare,
+  },
+  {
+    name: "Notifications",
+    href: "/notifications",
+    icon: Bell,
+    badge: 3,
+  },
+  {
+    name: "Analytics",
+    href: "/analytics",
+    icon: BarChart,
+  },
+  {
+    name: "Settings",
+    href: "/settings",
+    icon: Settings,
   },
 ];
 
@@ -124,6 +142,11 @@ export function Sidebar({ user }: SidebarProps) {
                 )}
               />
               {!collapsed && <span>{item.name}</span>}
+              {!collapsed && item.badge && (
+                <div className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                  {item.badge}
+                </div>
+              )}
               {isActive && !collapsed && (
                 <div className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary animate-pulse-glow" />
               )}

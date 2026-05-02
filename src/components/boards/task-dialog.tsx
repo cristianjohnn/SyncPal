@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -22,8 +21,6 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, Trash2, GitBranch, Save } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { logActivity } from "@/lib/activity";
 import { getPriorityColor, getStatusColor, formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 import type { TaskStatus, TaskPriority } from "@/types/database";
@@ -62,7 +59,6 @@ export function TaskDialog({
   onUpdate,
   onDelete,
 }: TaskDialogProps) {
-  const router = useRouter();
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
   const [status, setStatus] = useState<TaskStatus>(task.status);
@@ -78,73 +74,41 @@ export function TaskDialog({
     priority !== task.priority ||
     (assignedTo === "unassigned" ? null : assignedTo) !== task.assigned_to;
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!title.trim()) {
       toast.error("Title is required");
       return;
     }
+    
     setSaving(true);
-    try {
-      const supabase = createClient();
-      const updates = {
+    
+    const assignee = users.find(u => u.id === assignedTo);
+    
+    setTimeout(() => {
+      onUpdate({
+        ...task,
         title: title.trim(),
         description: description.trim() || null,
         status,
         priority,
         assigned_to: assignedTo === "unassigned" ? null : assignedTo,
         updated_at: new Date().toISOString(),
-      };
-
-      const { data, error } = await supabase
-        .from("tasks")
-        .update(updates)
-        .eq("id", task.id)
-        .select("*, assignee:users!tasks_assigned_to_fkey(id, full_name, avatar_url), branches(*)")
-        .single();
-
-      if (error) throw error;
-      if (data) {
-        onUpdate(data);
-        await logActivity({
-          action: "updated",
-          entityType: "task",
-          entityId: task.id,
-          metadata: { title: data.title },
-        });
-        toast.success("Task updated!");
-      }
-      router.refresh();
-    } catch {
-      toast.error("Failed to update task");
-    } finally {
+        assignee: assignee || null
+      });
+      toast.success("Task updated successfully!");
       setSaving(false);
-    }
+      onOpenChange(false);
+    }, 500);
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     setDeleting(true);
-    try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("tasks")
-        .delete()
-        .eq("id", task.id);
-
-      if (error) throw error;
-      await logActivity({
-        action: "deleted",
-        entityType: "task",
-        entityId: task.id,
-        metadata: { title: task.title },
-      });
+    setTimeout(() => {
       onDelete(task.id);
       toast.success("Task deleted");
-      router.refresh();
-    } catch {
-      toast.error("Failed to delete task");
-    } finally {
       setDeleting(false);
-    }
+      onOpenChange(false);
+    }, 500);
   };
 
   return (

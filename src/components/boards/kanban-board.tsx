@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import {
   DragDropContext,
   Droppable,
@@ -15,7 +14,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,14 +26,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Loader2, ArrowLeft } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { logActivity } from "@/lib/activity";
+import { Plus, ArrowLeft } from "lucide-react";
 import { TaskCard } from "@/components/boards/task-card";
 import { TaskDialog } from "@/components/boards/task-dialog";
 import { toast } from "sonner";
 import Link from "next/link";
-import type { Board, TaskStatus, TaskPriority } from "@/types/database";
+import type { TaskStatus, TaskPriority } from "@/types/database";
 
 const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
   { id: "todo", label: "To Do", color: "bg-slate-500" },
@@ -44,50 +40,82 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
   { id: "done", label: "Done", color: "bg-emerald-500" },
 ];
 
-interface TaskWithRelations {
-  id: string;
-  title: string;
-  description: string | null;
-  status: TaskStatus;
-  priority: TaskPriority;
-  board_id: string;
-  assigned_to: string | null;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  assignee?: { id: string; full_name: string; avatar_url: string | null } | null;
-  branches?: Array<{
-    id: string;
-    name: string;
-    status: string;
-  }>;
-}
+const MOCK_BOARD = {
+  id: "1",
+  name: "Frontend Redesign",
+  description: "Complete overhaul of the user interface using Tailwind v4.",
+};
 
-interface KanbanBoardProps {
-  board: Board;
-  tasks: TaskWithRelations[];
-  users: Array<{
-    id: string;
-    full_name: string;
-    avatar_url: string | null;
-    email: string;
-  }>;
-  isAdmin: boolean;
-}
+const MOCK_USERS = [
+  { id: "u1", full_name: "Alex Developer", avatar_url: "https://avatar.vercel.sh/alex", email: "alex@example.com" },
+  { id: "u2", full_name: "Sarah Chen", avatar_url: "https://avatar.vercel.sh/sarah", email: "sarah@example.com" },
+];
 
-export function KanbanBoard({
-  board,
-  tasks: initialTasks,
-  users,
-  isAdmin,
-}: KanbanBoardProps) {
-  const router = useRouter();
-  const [tasks, setTasks] = useState(initialTasks);
-  const [selectedTask, setSelectedTask] = useState<TaskWithRelations | null>(null);
+const MOCK_TASKS = [
+  {
+    id: "t1",
+    title: "Implement Navigation Bar",
+    description: "Create the top navigation bar with user profile and search.",
+    status: "done" as TaskStatus,
+    priority: "high" as TaskPriority,
+    board_id: "1",
+    assigned_to: "u1",
+    created_by: "u2",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    assignee: MOCK_USERS[0],
+    branches: [{ id: "b1", name: "feat/nav-bar", status: "merged" }]
+  },
+  {
+    id: "t2",
+    title: "Design System Migration",
+    description: "Move all colors and fonts to globals.css.",
+    status: "in_progress" as TaskStatus,
+    priority: "urgent" as TaskPriority,
+    board_id: "1",
+    assigned_to: "u2",
+    created_by: "u1",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    assignee: MOCK_USERS[1],
+    branches: [{ id: "b2", name: "chore/design-system", status: "ongoing" }]
+  },
+  {
+    id: "t3",
+    title: "Update Auth Flow",
+    description: "Use split layout for login and signup pages.",
+    status: "review" as TaskStatus,
+    priority: "medium" as TaskPriority,
+    board_id: "1",
+    assigned_to: "u1",
+    created_by: "u2",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    assignee: MOCK_USERS[0],
+    branches: [{ id: "b3", name: "feat/auth-ui", status: "review" }]
+  },
+  {
+    id: "t4",
+    title: "Kanban Board Drag & Drop",
+    description: "Implement drag and drop for task cards.",
+    status: "todo" as TaskStatus,
+    priority: "high" as TaskPriority,
+    board_id: "1",
+    assigned_to: "u1",
+    created_by: "u1",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    assignee: MOCK_USERS[0],
+    branches: []
+  }
+];
+
+export function KanbanBoard() {
+  const [tasks, setTasks] = useState<any[]>(MOCK_TASKS);
+  const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createColumn, setCreateColumn] = useState<TaskStatus>("todo");
-  const [creating, setCreating] = useState(false);
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -100,7 +128,7 @@ export function KanbanBoard({
     [tasks]
   );
 
-  const handleDragEnd = async (result: DropResult) => {
+  const handleDragEnd = (result: DropResult) => {
     const { destination, source, draggableId } = result;
     if (!destination) return;
     if (
@@ -112,78 +140,43 @@ export function KanbanBoard({
     const newStatus = destination.droppableId as TaskStatus;
     const taskId = draggableId;
 
-    // Optimistic update
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
     );
-
-    try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("tasks")
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq("id", taskId);
-
-      if (error) throw error;
-
-      await logActivity({
-        action: "status_changed",
-        entityType: "task",
-        entityId: taskId,
-        metadata: { from: source.droppableId, to: newStatus },
-      });
-    } catch {
-      // Revert on error
-      setTasks(initialTasks);
-      toast.error("Failed to update task status");
-    }
+    toast.success("Task moved successfully!");
   };
 
-  const handleCreateTask = async () => {
+  const handleCreateTask = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!newTask.title.trim()) {
       toast.error("Task title is required");
       return;
     }
-    setCreating(true);
-    try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data, error } = await supabase
-        .from("tasks")
-        .insert({
-          title: newTask.title.trim(),
-          description: newTask.description.trim() || null,
-          status: createColumn,
-          priority: newTask.priority,
-          board_id: board.id,
-          assigned_to: newTask.assigned_to || null,
-          created_by: user?.id,
-        })
-        .select("*, assignee:users!tasks_assigned_to_fkey(id, full_name, avatar_url)")
-        .single();
+    
+    const assignee = MOCK_USERS.find(u => u.id === newTask.assigned_to);
 
-      if (error) throw error;
-      if (data) {
-        setTasks((prev) => [...prev, { ...data, branches: [] }]);
-        await logActivity({
-          action: "created",
-          entityType: "task",
-          entityId: data.id,
-          metadata: { title: data.title, board: board.name },
-        });
-        toast.success("Task created!");
-      }
-      setNewTask({ title: "", description: "", priority: "medium", assigned_to: "" });
-      setCreateDialogOpen(false);
-      router.refresh();
-    } catch {
-      toast.error("Failed to create task");
-    } finally {
-      setCreating(false);
-    }
+    const createdTask = {
+      id: Math.random().toString(),
+      title: newTask.title.trim(),
+      description: newTask.description.trim(),
+      status: createColumn,
+      priority: newTask.priority,
+      board_id: MOCK_BOARD.id,
+      assigned_to: newTask.assigned_to || null,
+      created_by: "u1",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      assignee: assignee || null,
+      branches: []
+    };
+
+    setTasks((prev) => [...prev, createdTask]);
+    toast.success("Task created!");
+    setNewTask({ title: "", description: "", priority: "medium", assigned_to: "" });
+    setCreateDialogOpen(false);
   };
 
-  const handleTaskUpdate = (updatedTask: TaskWithRelations) => {
+  const handleTaskUpdate = (updatedTask: any) => {
     setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
     setSelectedTask(updatedTask);
   };
@@ -195,26 +188,26 @@ export function KanbanBoard({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 h-[calc(100vh-8rem)] flex flex-col animate-fade-in">
       {/* Board header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-3">
           <Link href="/boards">
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-full hover:bg-muted">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{board.name}</h1>
-            {board.description && (
+            <h1 className="text-2xl font-bold tracking-tight">{MOCK_BOARD.name}</h1>
+            {MOCK_BOARD.description && (
               <p className="text-sm text-muted-foreground mt-0.5">
-                {board.description}
+                {MOCK_BOARD.description}
               </p>
             )}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="text-xs">
+          <Badge variant="secondary" className="text-xs bg-muted/50">
             {tasks.length} tasks
           </Badge>
         </div>
@@ -222,27 +215,27 @@ export function KanbanBoard({
 
       {/* Kanban columns */}
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+        <div className="flex gap-6 overflow-x-auto pb-4 custom-scrollbar flex-1 items-stretch">
           {COLUMNS.map((column) => {
             const columnTasks = getTasksByStatus(column.id);
             return (
               <div
                 key={column.id}
-                className="flex-shrink-0 w-[300px] flex flex-col"
+                className="flex-shrink-0 w-[320px] flex flex-col rounded-xl bg-muted/20 border border-border overflow-hidden h-full"
               >
                 {/* Column header */}
-                <div className="flex items-center justify-between mb-3 px-1">
+                <div className="flex items-center justify-between p-3 border-b border-border/50 bg-muted/10 shrink-0">
                   <div className="flex items-center gap-2">
                     <div className={`h-2.5 w-2.5 rounded-full ${column.color}`} />
                     <h3 className="text-sm font-semibold">{column.label}</h3>
-                    <span className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                    <Badge variant="secondary" className="text-xs ml-1 bg-background/50">
                       {columnTasks.length}
-                    </span>
+                    </Badge>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground rounded-md"
                     onClick={() => {
                       setCreateColumn(column.id);
                       setCreateDialogOpen(true);
@@ -258,14 +251,14 @@ export function KanbanBoard({
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`flex-1 rounded-xl border-2 border-dashed p-2 min-h-[200px] space-y-2 transition-colors ${
+                      className={`flex-1 p-3 transition-colors ${
                         snapshot.isDraggingOver
-                          ? "kanban-drop-active border-primary/30"
-                          : "border-transparent bg-muted/30"
+                          ? "bg-primary/5"
+                          : ""
                       }`}
                     >
-                      <ScrollArea className="h-[calc(100vh-320px)]">
-                        <div className="space-y-2 pr-2">
+                      <ScrollArea className="h-full">
+                        <div className="space-y-3 pb-8 min-h-[100px]">
                           {columnTasks.map((task, index) => (
                             <Draggable
                               key={task.id}
@@ -281,6 +274,7 @@ export function KanbanBoard({
                                     setSelectedTask(task);
                                     setTaskDialogOpen(true);
                                   }}
+                                  className="group outline-none"
                                 >
                                   <TaskCard
                                     task={task}
@@ -296,6 +290,21 @@ export function KanbanBoard({
                     </div>
                   )}
                 </Droppable>
+                
+                {/* Add task button at bottom */}
+                <div className="p-2 border-t border-border/50 shrink-0">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-muted-foreground hover:text-foreground text-xs"
+                    onClick={() => {
+                      setCreateColumn(column.id);
+                      setCreateDialogOpen(true);
+                    }}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-2" />
+                    Add task
+                  </Button>
+                </div>
               </div>
             );
           })}
@@ -304,11 +313,11 @@ export function KanbanBoard({
 
       {/* Create task dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Create New Task</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-4">
+          <form onSubmit={handleCreateTask} className="space-y-4 pt-4">
             <div className="space-y-2">
               <Label htmlFor="taskTitle">Title</Label>
               <Input
@@ -318,6 +327,7 @@ export function KanbanBoard({
                 onChange={(e) =>
                   setNewTask({ ...newTask, title: e.target.value })
                 }
+                required
               />
             </div>
             <div className="space-y-2">
@@ -364,7 +374,7 @@ export function KanbanBoard({
                     <SelectValue placeholder="Unassigned" />
                   </SelectTrigger>
                   <SelectContent>
-                    {users.map((u) => (
+                    {MOCK_USERS.map((u) => (
                       <SelectItem key={u.id} value={u.id}>
                         {u.full_name}
                       </SelectItem>
@@ -373,15 +383,13 @@ export function KanbanBoard({
                 </Select>
               </div>
             </div>
-            <Button
-              onClick={handleCreateTask}
-              disabled={creating}
-              className="w-full"
-            >
-              {creating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Create Task
-            </Button>
-          </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Create Task</Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -389,8 +397,8 @@ export function KanbanBoard({
       {selectedTask && (
         <TaskDialog
           task={selectedTask}
-          users={users}
-          isAdmin={isAdmin}
+          users={MOCK_USERS}
+          isAdmin={true}
           open={taskDialogOpen}
           onOpenChange={setTaskDialogOpen}
           onUpdate={handleTaskUpdate}

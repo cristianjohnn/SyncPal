@@ -21,7 +21,7 @@ export function AppShell({ children, user }: AppShellProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header user={user} />
         <main className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+          <div className="p-8 max-w-[1200px] mx-auto w-full">
             {children}
           </div>
         </main>

@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,79 +16,68 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, Search, Kanban, Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { logActivity } from "@/lib/activity";
-import { getInitials, getStatusColor } from "@/lib/utils";
-import { EmptyState } from "@/components/shared/empty-state";
+import { Plus, Search, Kanban } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/shared/empty-state";
 
-interface BoardsListProps {
-  boards: Array<{
-    id: string;
-    name: string;
-    description: string | null;
-    created_at: string;
-    creator?: { id: string; full_name: string; avatar_url: string | null } | null;
-    tasks?: Array<{ id: string; status: string }>;
-  }>;
-  users: Array<{ id: string; full_name: string; avatar_url: string | null }>;
-}
+// Mock Data
+const MOCK_BOARDS = [
+  {
+    id: "1",
+    name: "Frontend Redesign",
+    description: "Complete overhaul of the user interface using Tailwind v4.",
+    tasks: { todo: 4, in_progress: 2, review: 1, done: 15 },
+    creator: { full_name: "Alex Developer", avatar_url: "https://avatar.vercel.sh/alex" }
+  },
+  {
+    id: "2",
+    name: "API V2 Migration",
+    description: "Migrating REST endpoints to GraphQL.",
+    tasks: { todo: 12, in_progress: 4, review: 3, done: 2 },
+    creator: { full_name: "Sarah Chen", avatar_url: "https://avatar.vercel.sh/sarah" }
+  },
+  {
+    id: "3",
+    name: "Q3 Marketing Launch",
+    description: "Tasks for the upcoming product hunt launch.",
+    tasks: { todo: 2, in_progress: 5, review: 2, done: 8 },
+    creator: { full_name: "Emily Davis", avatar_url: "https://avatar.vercel.sh/emily" }
+  }
+];
 
-export function BoardsList({ boards: initialBoards, users }: BoardsListProps) {
-  const router = useRouter();
-  const [boards, setBoards] = useState(initialBoards);
+export function BoardsList() {
+  const [boards, setBoards] = useState(MOCK_BOARDS);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [newBoard, setNewBoard] = useState({ name: "", description: "" });
 
   const filteredBoards = boards.filter((board) =>
     board.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleCreate = async () => {
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!newBoard.name.trim()) {
       toast.error("Board name is required");
       return;
     }
-    setCreating(true);
-    try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data, error } = await supabase
-        .from("boards")
-        .insert({
-          name: newBoard.name.trim(),
-          description: newBoard.description.trim() || null,
-          created_by: user?.id,
-        })
-        .select("*, creator:users!boards_created_by_fkey(id, full_name, avatar_url)")
-        .single();
-
-      if (error) throw error;
-      if (data) {
-        setBoards([{ ...data, tasks: [] }, ...boards]);
-        await logActivity({
-          action: "created",
-          entityType: "board",
-          entityId: data.id,
-          metadata: { name: data.name },
-        });
-        toast.success("Board created!");
-      }
-      setNewBoard({ name: "", description: "" });
-      setDialogOpen(false);
-      router.refresh();
-    } catch {
-      toast.error("Failed to create board");
-    } finally {
-      setCreating(false);
-    }
+    
+    const createdBoard = {
+      id: Math.random().toString(),
+      name: newBoard.name.trim(),
+      description: newBoard.description.trim(),
+      tasks: { todo: 0, in_progress: 0, review: 0, done: 0 },
+      creator: { full_name: "Alex Developer", avatar_url: "https://avatar.vercel.sh/alex" }
+    };
+    
+    setBoards([createdBoard, ...boards]);
+    toast.success("Board created successfully!");
+    setNewBoard({ name: "", description: "" });
+    setDialogOpen(false);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto animate-fade-in relative pb-24">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -98,61 +86,15 @@ export function BoardsList({ boards: initialBoards, users }: BoardsListProps) {
             Manage your project boards and track progress
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button className="gap-2 shadow-sm" />}>
-            <Plus className="h-4 w-4" />
-            New Board
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Board</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label htmlFor="boardName">Board Name</Label>
-                <Input
-                  id="boardName"
-                  placeholder="e.g., Sprint 1"
-                  value={newBoard.name}
-                  onChange={(e) =>
-                    setNewBoard({ ...newBoard, name: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="boardDesc">Description (optional)</Label>
-                <Textarea
-                  id="boardDesc"
-                  placeholder="Describe the board's purpose..."
-                  value={newBoard.description}
-                  onChange={(e) =>
-                    setNewBoard({ ...newBoard, description: e.target.value })
-                  }
-                  rows={3}
-                />
-              </div>
-              <Button
-                onClick={handleCreate}
-                disabled={creating}
-                className="w-full"
-              >
-                {creating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Create Board
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search boards..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+        <div className="relative max-w-sm w-full sm:w-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search boards..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 w-full sm:w-64"
+          />
+        </div>
       </div>
 
       {/* Board grid */}
@@ -163,78 +105,115 @@ export function BoardsList({ boards: initialBoards, users }: BoardsListProps) {
           description={
             search
               ? "Try a different search term"
-              : "Create your first board to start organizing tasks"
+              : "Create your first board to start organizing tasks."
           }
           actionLabel={!search ? "Create Board" : undefined}
           onAction={!search ? () => setDialogOpen(true) : undefined}
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {filteredBoards.map((board, index) => {
-            const total = board.tasks?.length || 0;
-            const done = board.tasks?.filter((t) => t.status === "done").length || 0;
-            const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+            const total = board.tasks.todo + board.tasks.in_progress + board.tasks.review + board.tasks.done;
 
             return (
-              <Link key={board.id} href={`/boards/${board.id}`}>
-                <Card
-                  className="hover:shadow-lg hover:border-primary/20 transition-all duration-300 cursor-pointer group animate-fade-in h-full"
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-base group-hover:text-primary transition-colors">
-                        {board.name}
-                      </CardTitle>
-                      {board.creator && (
-                        <Avatar className="h-6 w-6 shrink-0">
-                          <AvatarImage src={board.creator.avatar_url || undefined} />
-                          <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
-                            {getInitials(board.creator.full_name)}
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                    </div>
-                    {board.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                        {board.description}
-                      </p>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-2 flex-wrap mb-3">
-                      <Badge variant="secondary" className="text-[10px]">
-                        {total} tasks
-                      </Badge>
-                      {done > 0 && (
-                        <Badge
-                          variant="secondary"
-                          className={`text-[10px] ${getStatusColor("done")}`}
-                        >
-                          {done} done
-                        </Badge>
-                      )}
-                    </div>
-                    {/* Progress bar */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-muted-foreground">
-                        <span>Progress</span>
-                        <span>{progress}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all duration-500"
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+              <Card
+                key={board.id}
+                className="hover:shadow-lg hover:border-primary/50 transition-all duration-300 group flex flex-col h-full bg-card"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <CardHeader className="pb-3 flex-1">
+                  <div className="flex items-start justify-between">
+                    <CardTitle className="text-lg group-hover:text-primary transition-colors">
+                      {board.name}
+                    </CardTitle>
+                    <Avatar className="h-8 w-8 shrink-0 border border-border">
+                      <AvatarImage src={board.creator.avatar_url} />
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                        {board.creator.full_name.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                  {board.description && (
+                    <CardDescription className="line-clamp-2 mt-2">
+                      {board.description}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2 flex-wrap mb-6">
+                    <Badge variant="secondary" className="bg-muted/50 text-xs">
+                      {total} tasks
+                    </Badge>
+                    <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 text-xs">
+                      {board.tasks.todo} todo
+                    </Badge>
+                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 text-xs">
+                      {board.tasks.in_progress} active
+                    </Badge>
+                    <Badge variant="secondary" className="bg-purple-500/10 text-purple-500 text-xs">
+                      {board.tasks.review} review
+                    </Badge>
+                    <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 text-xs">
+                      {board.tasks.done} done
+                    </Badge>
+                  </div>
+                  
+                  <div className="pt-2 opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-200">
+                    <Link href={`/boards/${board.id}`} className={buttonVariants({ className: "w-full" })}>
+                      Open Board
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
             );
           })}
         </div>
       )}
+
+      {/* Floating Action Button */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogTrigger render={
+          <Button
+            size="icon"
+            className="fixed bottom-8 right-8 h-14 w-14 rounded-full shadow-2xl hover:scale-105 transition-transform bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        } />
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Board</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="boardName">Board Name</Label>
+              <Input
+                id="boardName"
+                placeholder="e.g., Sprint 1"
+                value={newBoard.name}
+                onChange={(e) => setNewBoard({ ...newBoard, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="boardDesc">Description (optional)</Label>
+              <Textarea
+                id="boardDesc"
+                placeholder="Describe the board's purpose..."
+                value={newBoard.description}
+                onChange={(e) => setNewBoard({ ...newBoard, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Create Board</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
