@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -16,64 +23,54 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, Search, Kanban } from "lucide-react";
+import { Plus, Search, Kanban, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/shared/empty-state";
+import { createBoard } from "@/app/(app)/boards/actions";
+import type { BoardListItem } from "@/lib/queries/boards";
 
-// Mock Data
-const MOCK_BOARDS = [
-  {
-    id: "1",
-    name: "Frontend Redesign",
-    description: "Complete overhaul of the user interface using Tailwind v4.",
-    tasks: { todo: 4, in_progress: 2, review: 1, done: 15 },
-    creator: { full_name: "Alex Developer", avatar_url: "https://avatar.vercel.sh/alex" }
-  },
-  {
-    id: "2",
-    name: "API V2 Migration",
-    description: "Migrating REST endpoints to GraphQL.",
-    tasks: { todo: 12, in_progress: 4, review: 3, done: 2 },
-    creator: { full_name: "Sarah Chen", avatar_url: "https://avatar.vercel.sh/sarah" }
-  },
-  {
-    id: "3",
-    name: "Q3 Marketing Launch",
-    description: "Tasks for the upcoming product hunt launch.",
-    tasks: { todo: 2, in_progress: 5, review: 2, done: 8 },
-    creator: { full_name: "Emily Davis", avatar_url: "https://avatar.vercel.sh/emily" }
-  }
-];
+interface BoardsListProps {
+  initialBoards: BoardListItem[];
+}
 
-export function BoardsList() {
-  const [boards, setBoards] = useState(MOCK_BOARDS);
+export function BoardsList({ initialBoards }: BoardsListProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [newBoard, setNewBoard] = useState({ name: "", description: "" });
 
-  const filteredBoards = boards.filter((board) =>
-    board.name.toLowerCase().includes(search.toLowerCase())
+  const filteredBoards = useMemo(
+    () =>
+      initialBoards.filter((board) =>
+        board.name.toLowerCase().includes(search.toLowerCase())
+      ),
+    [initialBoards, search]
   );
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBoard.name.trim()) {
       toast.error("Board name is required");
       return;
     }
-    
-    const createdBoard = {
-      id: Math.random().toString(),
+
+    setCreating(true);
+    const result = await createBoard({
       name: newBoard.name.trim(),
-      description: newBoard.description.trim(),
-      tasks: { todo: 0, in_progress: 0, review: 0, done: 0 },
-      creator: { full_name: "Alex Developer", avatar_url: "https://avatar.vercel.sh/alex" }
-    };
-    
-    setBoards([createdBoard, ...boards]);
+      description: newBoard.description.trim() || null,
+    });
+    setCreating(false);
+
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+
     toast.success("Board created successfully!");
     setNewBoard({ name: "", description: "" });
     setDialogOpen(false);
+    router.refresh();
   };
 
   return (
@@ -113,7 +110,11 @@ export function BoardsList() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {filteredBoards.map((board, index) => {
-            const total = board.tasks.todo + board.tasks.in_progress + board.tasks.review + board.tasks.done;
+            const tc = board.taskCounts;
+            const total =
+              tc.todo + tc.in_progress + tc.review + tc.done;
+
+            const creator = board.creator;
 
             return (
               <Card
@@ -126,12 +127,20 @@ export function BoardsList() {
                     <CardTitle className="text-lg group-hover:text-primary transition-colors">
                       {board.name}
                     </CardTitle>
-                    <Avatar className="h-8 w-8 shrink-0 border border-border">
-                      <AvatarImage src={board.creator.avatar_url} />
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                        {board.creator.full_name.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
+                    {creator ? (
+                      <Avatar className="h-8 w-8 shrink-0 border border-border">
+                        <AvatarImage src={creator.avatar_url ?? undefined} />
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                          {creator.full_name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : (
+                      <Avatar className="h-8 w-8 shrink-0 border border-border">
+                        <AvatarFallback className="bg-muted text-xs">
+                          ?
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
                   </div>
                   {board.description && (
                     <CardDescription className="line-clamp-2 mt-2">
@@ -144,22 +153,37 @@ export function BoardsList() {
                     <Badge variant="secondary" className="bg-muted/50 text-xs">
                       {total} tasks
                     </Badge>
-                    <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 text-xs">
-                      {board.tasks.todo} todo
+                    <Badge
+                      variant="secondary"
+                      className="bg-blue-500/10 text-blue-500 text-xs"
+                    >
+                      {tc.todo} todo
                     </Badge>
-                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 text-xs">
-                      {board.tasks.in_progress} active
+                    <Badge
+                      variant="secondary"
+                      className="bg-amber-500/10 text-amber-500 text-xs"
+                    >
+                      {tc.in_progress} active
                     </Badge>
-                    <Badge variant="secondary" className="bg-purple-500/10 text-purple-500 text-xs">
-                      {board.tasks.review} review
+                    <Badge
+                      variant="secondary"
+                      className="bg-purple-500/10 text-purple-500 text-xs"
+                    >
+                      {tc.review} review
                     </Badge>
-                    <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 text-xs">
-                      {board.tasks.done} done
+                    <Badge
+                      variant="secondary"
+                      className="bg-emerald-500/10 text-emerald-500 text-xs"
+                    >
+                      {tc.done} done
                     </Badge>
                   </div>
-                  
+
                   <div className="pt-2 opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-200">
-                    <Link href={`/boards/${board.id}`} className={buttonVariants({ className: "w-full" })}>
+                    <Link
+                      href={`/boards/${board.id}`}
+                      className={buttonVariants({ className: "w-full" })}
+                    >
                       Open Board
                     </Link>
                   </div>
@@ -172,14 +196,16 @@ export function BoardsList() {
 
       {/* Floating Action Button */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogTrigger render={
-          <Button
-            size="icon"
-            className="fixed bottom-8 right-8 h-14 w-14 rounded-full shadow-2xl hover:scale-105 transition-transform bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Plus className="h-6 w-6" />
-          </Button>
-        } />
+        <DialogTrigger
+          render={
+            <Button
+              size="icon"
+              className="fixed bottom-8 right-8 h-14 w-14 rounded-full shadow-2xl hover:scale-105 transition-transform bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <Plus className="h-6 w-6" />
+            </Button>
+          }
+        />
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Create New Board</DialogTitle>
@@ -191,7 +217,9 @@ export function BoardsList() {
                 id="boardName"
                 placeholder="e.g., Sprint 1"
                 value={newBoard.name}
-                onChange={(e) => setNewBoard({ ...newBoard, name: e.target.value })}
+                onChange={(e) =>
+                  setNewBoard({ ...newBoard, name: e.target.value })
+                }
                 required
               />
             </div>
@@ -201,15 +229,30 @@ export function BoardsList() {
                 id="boardDesc"
                 placeholder="Describe the board's purpose..."
                 value={newBoard.description}
-                onChange={(e) => setNewBoard({ ...newBoard, description: e.target.value })}
+                onChange={(e) =>
+                  setNewBoard({ ...newBoard, description: e.target.value })
+                }
                 rows={3}
               />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit">Create Board</Button>
+              <Button type="submit" disabled={creating}>
+                {creating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Creating…
+                  </>
+                ) : (
+                  "Create Board"
+                )}
+              </Button>
             </div>
           </form>
         </DialogContent>

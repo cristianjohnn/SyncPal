@@ -1,6 +1,6 @@
-# Synqr — Setup Guide
+# SyncPal — Setup Guide
 
-This guide provides step-by-step instructions for each team role to get started with the Synqr project.
+This guide provides step-by-step instructions for each team role to get started with the SyncPal project.
 
 ---
 
@@ -23,7 +23,7 @@ This guide provides step-by-step instructions for each team role to get started 
 1. Go to [supabase.com](https://supabase.com/) and sign in
 2. Click **"New Project"**
 3. Fill in:
-   - **Name**: `synqr`
+   - **Name**: `syncpal`
    - **Database Password**: Generate a strong password (save it!)
    - **Region**: Choose the closest to your team
 4. Click **"Create new project"** and wait for provisioning (~2 minutes)
@@ -48,7 +48,7 @@ This guide provides step-by-step instructions for each team role to get started 
 1. Go to [GitHub Developer Settings → OAuth Apps](https://github.com/settings/developers)
 2. Click **"New OAuth App"**
 3. Fill in:
-   - **Application name**: `Synqr`
+   - **Application name**: `SyncPal`
    - **Homepage URL**: `http://localhost:3000`
    - **Authorization callback URL**: `https://YOUR_PROJECT_ID.supabase.co/auth/v1/callback`
      _(Get this URL from Supabase → Authentication → Providers → GitHub)_
@@ -68,12 +68,12 @@ This guide provides step-by-step instructions for each team role to get started 
 4. Click **"Create Credentials" → "OAuth client ID"**
 5. If prompted, configure the **OAuth consent screen** first:
    - User Type: External
-   - App name: `Synqr`
+   - App name: `SyncPal`
    - Support email: your email
    - Authorized domains: `supabase.co`
 6. Create the OAuth client:
    - Application type: **Web application**
-   - Name: `Synqr`
+   - Name: `SyncPal`
    - Authorized redirect URIs: `https://YOUR_PROJECT_ID.supabase.co/auth/v1/callback`
 7. Copy the **Client ID** and **Client Secret**
 8. In Supabase Dashboard → **Authentication → Providers → Google**:
@@ -94,8 +94,8 @@ This guide provides step-by-step instructions for each team role to get started 
 ### Clone and Install
 
 ```bash
-git clone git@github.com:cristianjohnn/SynQR.git
-cd SynQR
+git clone git@github.com:cristianjohnn/SyncPal.git
+cd SyncPal
 npm install
 ```
 

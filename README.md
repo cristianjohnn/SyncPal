@@ -1,8 +1,8 @@
-# Synqr
+# SyncPal
 
 > **Where development teams stay in flow.**
 
-A lightweight project management platform designed for small, fast-moving development teams. Synqr combines task management, Git branch tracking, and workflow visibility into a single streamlined workspace.
+A lightweight project management platform designed for small, fast-moving development teams. SyncPal combines task management, Git branch tracking, and workflow visibility into a single streamlined workspace.
 
 Built by developers, for developers.
 
@@ -47,8 +47,8 @@ Built by developers, for developers.
 ### 1. Clone the repository
 
 ```bash
-git clone git@github.com:cristianjohnn/SynQR.git
-cd SynQR
+git clone git@github.com:cristianjohnn/SyncPal.git
+cd SyncPal
 ```
 
 ### 2. Install dependencies
@@ -98,7 +98,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ## 📁 Project Structure
 
 ```
-synqr/
+syncpal/
 ├── src/
 │   ├── app/
 │   │   ├── (auth)/           # Auth pages (login, signup)

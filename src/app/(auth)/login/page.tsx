@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Zap, Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { AuroraBackground } from "@/components/AuroraBackground";
 
 function LoginContent() {
   const router = useRouter();
@@ -72,16 +73,20 @@ function LoginContent() {
     <div className="w-full max-w-md animate-fade-in">
       {/* Card */}
       <div className="glass rounded-2xl p-8 shadow-2xl shadow-black/5 dark:shadow-black/20">
-        {/* Logo & Header */}
+        {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground mb-4 shadow-lg shadow-primary/25">
-            <Zap className="h-6 w-6" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight gradient-text">
-            Synqr
+          <img
+            src="/syncpal-logo.png"
+            alt="SyncPal Icon"
+            width={80}
+            height={80}
+            style={{ objectFit: "contain", filter: "drop-shadow(0 0 20px rgba(124, 58, 237, 0.4))" }}
+          />
+          <h1 className="text-white text-4xl font-extrabold tracking-tight leading-none mt-1">
+            Sync<span className="text-[#7C3AED]">Pal</span>
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Where development teams stay in flow
+          <p className="text-muted-foreground text-sm mt-1 font-medium">
+            Where dev teams stay in <span className="text-[#7C3AED]">flow.</span>
           </p>
         </div>
 
@@ -228,8 +233,11 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
-      <LoginContent />
-    </Suspense>
+    <div className="relative min-h-screen w-full">
+      <AuroraBackground />
+      <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+        <LoginContent />
+      </Suspense>
+    </div>
   );
 }

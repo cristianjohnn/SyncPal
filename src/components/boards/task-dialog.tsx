@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -21,51 +21,70 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, Trash2, GitBranch, Save } from "lucide-react";
-import { getPriorityColor, getStatusColor, formatRelativeTime } from "@/lib/utils";
+import { getStatusColor, formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 import type { TaskStatus, TaskPriority } from "@/types/database";
+import type { KanbanTask } from "@/lib/queries/boards";
+import { deleteTask, updateTask } from "@/app/(app)/boards/actions";
 
-interface TaskWithRelations {
+interface TaskDirectoryUser {
   id: string;
-  title: string;
-  description: string | null;
-  status: TaskStatus;
-  priority: TaskPriority;
-  board_id: string;
-  assigned_to: string | null;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  assignee?: { id: string; full_name: string; avatar_url: string | null } | null;
-  branches?: Array<{ id: string; name: string; status: string }>;
+  full_name: string;
+  avatar_url: string | null;
+  email: string;
 }
 
-interface TaskDialogProps {
-  task: TaskWithRelations;
-  users: Array<{ id: string; full_name: string; avatar_url: string | null; email: string }>;
-  isAdmin: boolean;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onUpdate: (task: TaskWithRelations) => void;
-  onDelete: (taskId: string) => void;
-}
+type TaskDialogProps =
+  | {
+      mode: "server";
+      boardId: string;
+      task: KanbanTask;
+      users: TaskDirectoryUser[];
+      canDelete: boolean;
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+      onUpdated: (task: KanbanTask) => void;
+      onDeleted: (taskId: string) => void;
+    }
+  | {
+      mode: "local";
+      task: KanbanTask;
+      users: TaskDirectoryUser[];
+      isAdmin: boolean;
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+      onUpdate: (task: KanbanTask) => void;
+      onDelete: (taskId: string) => void;
+    };
 
-export function TaskDialog({
-  task,
-  users,
-  isAdmin,
-  open,
-  onOpenChange,
-  onUpdate,
-  onDelete,
-}: TaskDialogProps) {
+export function TaskDialog(props: TaskDialogProps) {
+  const { task, users, open, onOpenChange } = props;
+
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
   const [status, setStatus] = useState<TaskStatus>(task.status);
   const [priority, setPriority] = useState<TaskPriority>(task.priority);
-  const [assignedTo, setAssignedTo] = useState(task.assigned_to || "unassigned");
+  const [assignedTo, setAssignedTo] = useState(
+    task.assigned_to || "unassigned"
+  );
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    setTitle(task.title);
+    setDescription(task.description || "");
+    setStatus(task.status);
+    setPriority(task.priority);
+    setAssignedTo(task.assigned_to || "unassigned");
+  }, [
+    task.id,
+    task.title,
+    task.description,
+    task.status,
+    task.priority,
+    task.assigned_to,
+    task.updated_at,
+  ]);
 
   const hasChanges =
     title !== task.title ||
@@ -74,41 +93,96 @@ export function TaskDialog({
     priority !== task.priority ||
     (assignedTo === "unassigned" ? null : assignedTo) !== task.assigned_to;
 
-  const handleSave = () => {
+  const canDelete =
+    props.mode === "server" ? props.canDelete : props.isAdmin;
+
+  const buildPatchedTask = (): KanbanTask => {
+    const assignee =
+      assignedTo === "unassigned"
+        ? null
+        : (users.find((u) => u.id === assignedTo) ?? null);
+    return {
+      ...task,
+      title: title.trim(),
+      description: description.trim() || null,
+      status,
+      priority,
+      assigned_to: assignedTo === "unassigned" ? null : assignedTo,
+      updated_at: new Date().toISOString(),
+      assignee: assignee
+        ? {
+            id: assignee.id,
+            full_name: assignee.full_name,
+            avatar_url: assignee.avatar_url,
+          }
+        : null,
+      branches: task.branches ?? [],
+    };
+  };
+
+  const handleSave = async () => {
     if (!title.trim()) {
       toast.error("Title is required");
       return;
     }
-    
+
+    if (props.mode === "local") {
+      setSaving(true);
+      window.setTimeout(() => {
+        props.onUpdate(buildPatchedTask());
+        toast.success("Task updated successfully!");
+        setSaving(false);
+        onOpenChange(false);
+      }, 400);
+      return;
+    }
+
     setSaving(true);
-    
-    const assignee = users.find(u => u.id === assignedTo);
-    
-    setTimeout(() => {
-      onUpdate({
-        ...task,
-        title: title.trim(),
-        description: description.trim() || null,
-        status,
-        priority,
-        assigned_to: assignedTo === "unassigned" ? null : assignedTo,
-        updated_at: new Date().toISOString(),
-        assignee: assignee || null
-      });
-      toast.success("Task updated successfully!");
-      setSaving(false);
-      onOpenChange(false);
-    }, 500);
+    const result = await updateTask({
+      board_id: props.boardId,
+      id: task.id,
+      title: title.trim(),
+      description: description.trim() || null,
+      status,
+      priority,
+      assigned_to: assignedTo === "unassigned" ? null : assignedTo,
+    });
+    setSaving(false);
+
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+
+    props.onUpdated(result.data);
+    toast.success("Task updated successfully!");
+    onOpenChange(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
+    if (props.mode === "local") {
+      setDeleting(true);
+      window.setTimeout(() => {
+        props.onDelete(task.id);
+        toast.success("Task deleted");
+        setDeleting(false);
+        onOpenChange(false);
+      }, 400);
+      return;
+    }
+
     setDeleting(true);
-    setTimeout(() => {
-      onDelete(task.id);
-      toast.success("Task deleted");
-      setDeleting(false);
-      onOpenChange(false);
-    }, 500);
+    const result = await deleteTask({ board_id: props.boardId, id: task.id });
+    setDeleting(false);
+
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+
+    props.onDeleted(task.id);
+    toast.success("Task deleted");
+    onOpenChange(false);
   };
 
   return (
@@ -119,7 +193,6 @@ export function TaskDialog({
         </DialogHeader>
 
         <div className="space-y-4 pt-2">
-          {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="editTitle">Title</Label>
             <Input
@@ -129,7 +202,6 @@ export function TaskDialog({
             />
           </div>
 
-          {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="editDesc">Description</Label>
             <Textarea
@@ -141,7 +213,6 @@ export function TaskDialog({
             />
           </div>
 
-          {/* Status & Priority */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Status</Label>
@@ -179,10 +250,12 @@ export function TaskDialog({
             </div>
           </div>
 
-          {/* Assignee */}
           <div className="space-y-2">
             <Label>Assigned to</Label>
-            <Select value={assignedTo} onValueChange={(v) => v && setAssignedTo(v)}>
+            <Select
+              value={assignedTo}
+              onValueChange={(v) => v && setAssignedTo(v)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Unassigned" />
               </SelectTrigger>
@@ -197,7 +270,6 @@ export function TaskDialog({
             </Select>
           </div>
 
-          {/* Branches */}
           {task.branches && task.branches.length > 0 && (
             <div className="space-y-2">
               <Label>Linked Branches</Label>
@@ -216,7 +288,6 @@ export function TaskDialog({
             </div>
           )}
 
-          {/* Meta info */}
           <div className="text-xs text-muted-foreground">
             Created {formatRelativeTime(task.created_at)}
             {task.updated_at !== task.created_at && (
@@ -226,12 +297,12 @@ export function TaskDialog({
 
           <Separator />
 
-          {/* Actions */}
           <div className="flex items-center justify-between">
-            {isAdmin && (
+            {canDelete && (
               <Button
                 variant="destructive"
                 size="sm"
+                type="button"
                 onClick={handleDelete}
                 disabled={deleting}
                 className="gap-1.5"
@@ -248,12 +319,14 @@ export function TaskDialog({
               <Button
                 variant="outline"
                 size="sm"
+                type="button"
                 onClick={() => onOpenChange(false)}
               >
                 Cancel
               </Button>
               <Button
                 size="sm"
+                type="button"
                 onClick={handleSave}
                 disabled={saving || !hasChanges}
                 className="gap-1.5"

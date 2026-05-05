@@ -29,26 +29,30 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refresh the session — important for Server Components
+  // Log all cookie names for debugging
+  const allCookies = request.cookies.getAll();
+  console.log(`[Middleware] ${request.nextUrl.pathname} - cookies:`, allCookies.map(c => c.name));
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Define public routes that don't require authentication
-  const publicRoutes = ["/login", "/signup", "/auth/callback"];
+  console.log(`[Middleware] ${request.nextUrl.pathname} - user:`, user?.id ?? "NONE");
+
+  const publicRoutes = ["/login", "/signup"];
   const isPublicRoute = publicRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   );
 
-  // Redirect unauthenticated users to login
   if (!user && !isPublicRoute) {
+    console.log(`[Middleware] ${request.nextUrl.pathname} → redirect /login (no user)`);
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users away from auth pages
   if (user && isPublicRoute) {
+    console.log(`[Middleware] ${request.nextUrl.pathname} → redirect /dashboard (user on public)`);
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

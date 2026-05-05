@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -99,13 +100,13 @@ export function Sidebar({ user }: SidebarProps) {
       {/* Logo */}
       <div className="flex items-center h-16 px-4 border-b border-sidebar-border">
         <Link href="/dashboard" className="flex items-center gap-3 group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-sm transition-all group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-primary/25">
-            <Zap className="h-5 w-5" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 transition-all group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-primary/25 overflow-hidden">
+            <Image src="/syncpal-logo.png" alt="SyncPal Logo" width={24} height={24} style={{ objectFit: "contain", filter: "drop-shadow(0 0 8px rgba(124, 58, 237, 0.4))" }} />
           </div>
           {!collapsed && (
             <div className="animate-fade-in">
               <span className="text-lg font-bold tracking-tight gradient-text">
-                Synqr
+                SyncPal
               </span>
             </div>
           )}

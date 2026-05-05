@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Synqr — Where development teams stay in flow",
-    template: "%s | Synqr",
+    default: "SyncPal — Where development teams stay in flow",
+    template: "%s | SyncPal",
   },
   description:
     "A lightweight project management platform designed for small, fast-moving development teams. Combine task management, Git branch tracking, and workflow visibility in one streamlined workspace.",

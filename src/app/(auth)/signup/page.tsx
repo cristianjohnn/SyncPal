@@ -75,14 +75,18 @@ export default function SignUpPage() {
       <div className="glass rounded-2xl p-8 shadow-2xl shadow-black/5 dark:shadow-black/20">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground mb-4 shadow-lg shadow-primary/25">
-            <Zap className="h-6 w-6" />
-          </div>
+          <img
+            src="/syncpal-logo.png"
+            alt="SyncPal Icon"
+            width={80}
+            height={80}
+            style={{ objectFit: "contain", filter: "drop-shadow(0 0 20px rgba(124, 58, 237, 0.4))" }}
+          />
           <h1 className="text-2xl font-bold tracking-tight gradient-text">
             Create your account
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Join your team on Synqr
+            Join your team on SyncPal
           </p>
         </div>
 
