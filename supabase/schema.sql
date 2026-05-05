@@ -1,7 +1,19 @@
 -- ================================================
 -- SyncPal — Complete Database Schema
--- Run this in your Supabase SQL Editor
+-- Safe to re-run: drops existing tables first
 -- ================================================
+
+-- ================================================
+-- 0. DROP EXISTING TABLES (safe re-run)
+-- ================================================
+DROP TABLE IF EXISTS public.activity_log CASCADE;
+DROP TABLE IF EXISTS public.branches CASCADE;
+DROP TABLE IF EXISTS public.tasks CASCADE;
+DROP TABLE IF EXISTS public.boards CASCADE;
+DROP TABLE IF EXISTS public.users CASCADE;
+
+-- Drop existing function if any
+DROP FUNCTION IF EXISTS update_updated_at CASCADE;
 
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -112,26 +124,22 @@ ALTER TABLE public.activity_log ENABLE ROW LEVEL SECURITY;
 -- ------------------------------------------------
 -- USERS POLICIES
 -- ------------------------------------------------
--- All authenticated users can read all profiles
 CREATE POLICY "Users can view all profiles"
   ON public.users FOR SELECT
   TO authenticated
   USING (true);
 
--- Users can update their own profile
 CREATE POLICY "Users can update own profile"
   ON public.users FOR UPDATE
   TO authenticated
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
 
--- Users can insert their own profile (signup)
 CREATE POLICY "Users can insert own profile"
   ON public.users FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = id);
 
--- Admins can update any profile (role changes)
 CREATE POLICY "Admins can update any profile"
   ON public.users FOR UPDATE
   TO authenticated
@@ -145,19 +153,16 @@ CREATE POLICY "Admins can update any profile"
 -- ------------------------------------------------
 -- BOARDS POLICIES
 -- ------------------------------------------------
--- All authenticated users can read boards
 CREATE POLICY "Authenticated users can read boards"
   ON public.boards FOR SELECT
   TO authenticated
   USING (true);
 
--- All authenticated users can create boards
 CREATE POLICY "Authenticated users can create boards"
   ON public.boards FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = created_by);
 
--- Board creators and admins can update boards
 CREATE POLICY "Board creators and admins can update boards"
   ON public.boards FOR UPDATE
   TO authenticated
@@ -169,7 +174,6 @@ CREATE POLICY "Board creators and admins can update boards"
     )
   );
 
--- Board creators and admins can delete boards
 CREATE POLICY "Board creators and admins can delete boards"
   ON public.boards FOR DELETE
   TO authenticated
@@ -184,19 +188,16 @@ CREATE POLICY "Board creators and admins can delete boards"
 -- ------------------------------------------------
 -- TASKS POLICIES
 -- ------------------------------------------------
--- All authenticated users can read tasks
 CREATE POLICY "Authenticated users can read tasks"
   ON public.tasks FOR SELECT
   TO authenticated
   USING (true);
 
--- All authenticated users can create tasks
 CREATE POLICY "Authenticated users can create tasks"
   ON public.tasks FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = created_by);
 
--- Task creators, assignees, and admins can update tasks
 CREATE POLICY "Task creators, assignees and admins can update tasks"
   ON public.tasks FOR UPDATE
   TO authenticated
@@ -209,7 +210,6 @@ CREATE POLICY "Task creators, assignees and admins can update tasks"
     )
   );
 
--- Task creators and admins can delete tasks
 CREATE POLICY "Task creators and admins can delete tasks"
   ON public.tasks FOR DELETE
   TO authenticated
@@ -224,19 +224,16 @@ CREATE POLICY "Task creators and admins can delete tasks"
 -- ------------------------------------------------
 -- BRANCHES POLICIES
 -- ------------------------------------------------
--- All authenticated users can read branches
 CREATE POLICY "Authenticated users can read branches"
   ON public.branches FOR SELECT
   TO authenticated
   USING (true);
 
--- All authenticated users can create branches
 CREATE POLICY "Authenticated users can create branches"
   ON public.branches FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = created_by);
 
--- Branch creators and admins can update branches
 CREATE POLICY "Branch creators and admins can update branches"
   ON public.branches FOR UPDATE
   TO authenticated
@@ -248,7 +245,6 @@ CREATE POLICY "Branch creators and admins can update branches"
     )
   );
 
--- Branch creators and admins can delete branches
 CREATE POLICY "Branch creators and admins can delete branches"
   ON public.branches FOR DELETE
   TO authenticated
@@ -263,13 +259,11 @@ CREATE POLICY "Branch creators and admins can delete branches"
 -- ------------------------------------------------
 -- ACTIVITY LOG POLICIES
 -- ------------------------------------------------
--- All authenticated users can read activity logs
 CREATE POLICY "Authenticated users can read activity logs"
   ON public.activity_log FOR SELECT
   TO authenticated
   USING (true);
 
--- All authenticated users can insert activity logs
 CREATE POLICY "Authenticated users can insert activity logs"
   ON public.activity_log FOR INSERT
   TO authenticated
